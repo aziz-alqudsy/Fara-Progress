@@ -82,8 +82,18 @@ yang langsung dipakai sebagai `WEBHOOK_URL`.
 
    > **Jangan** set `WEBHOOK_PORT`. Render menyuntik env var `PORT` sendiri dan
    > bot otomatis bind ke port tersebut.
+   >
+   > **Jangan** isi `WEBHOOK_PATH` dengan token bot — nilainya ikut tercetak di
+   > log Render. Pakai nilai biasa seperti `telegram`.
 
 6. Deploy. Bot otomatis mendaftarkan webhook ke Telegram saat start.
+
+### Versi Python (WAJIB)
+
+`python-telegram-bot` 21.6 belum mendukung Python 3.14 (yang dipakai Render secara
+default) — akan muncul `RuntimeError: There is no current event loop`. Repo ini
+menyertakan file **`.python-version`** (`3.12.7`) yang otomatis dibaca Render untuk
+mem-pin versi Python. Alternatif: set env var `PYTHON_VERSION=3.12.7` di dashboard.
 
 ### ⚠️ Catatan penting Render
 
