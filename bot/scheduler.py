@@ -125,28 +125,84 @@ async def fire_reminder(application, reminder_id) -> None:
         db.deactivate_reminder(reminder_id)
 
 
-async def run_nags(application) -> None:
-    """Pengingat harian: mention pengguna yang belum update pada run yang masih open."""
+def _run_age_days(run_at_epoch, tz_name) -> int:
+    """Selisih hari kalender (zona reminder) antara tanggal run dibuat dan hari ini.
+
+    Run dibuat di hari H -> 0; keesokan harinya -> 1 (H+1); lusa -> 2 (H+2)."""
+    tz = _tz(tz_name)
+    run_date = datetime.fromtimestamp(run_at_epoch, tz=tz).date()
+    today = datetime.now(tz).date()
+    return (today - run_date).days
+
+
+async def _send_nag(application, run, reminder, pending) -> None:
+    text = texts.build_nag_text(reminder, pending)
+    reply_to = db.get_run_reminder_message(run["id"])
+    try:
+        msg = await application.bot.send_message(
+            chat_id=reminder["chat_id"],
+            message_thread_id=reminder["thread_id"] or None,
+            text=text,
+            parse_mode="HTML",
+            reply_to_message_id=reply_to,
+            allow_sending_without_reply=True,
+        )
+        db.add_run_message(run["id"], msg.message_id, "nag")
+    except Exception:
+        log.exception("Gagal mengirim nag untuk run %s", run["id"])
+
+
+async def _send_final_summary(application, run, reminder, assignees) -> None:
+    """Ringkasan final di H+2 — dikirim apa pun kondisinya, lalu run ditutup."""
+    rows = [
+        (texts.assignee_mention(a), db.get_latest_progress(run["id"], a))
+        for a in assignees
+    ]
+    all_done = bool(assignees) and all(
+        db.has_replied(run["id"], a) for a in assignees
+    )
+    text = texts.build_summary_text(reminder, rows, all_done=all_done)
+    reply_to = db.get_run_reminder_message(run["id"])
+    try:
+        msg = await application.bot.send_message(
+            chat_id=reminder["chat_id"],
+            message_thread_id=reminder["thread_id"] or None,
+            text=text,
+            parse_mode="HTML",
+            reply_to_message_id=reply_to,
+            allow_sending_without_reply=True,
+        )
+        db.add_run_message(run["id"], msg.message_id, "summary")
+    except Exception:
+        log.exception("Gagal mengirim ringkasan final untuk run %s", run["id"])
+    finally:
+        db.set_run_status(run["id"], "summarized")
+
+
+async def run_daily_followups(application) -> None:
+    """Tindak lanjut harian per run terbuka, sesuai umur run (zona reminder):
+
+      H+1 -> pengingat harian ke pengguna yang BELUM update (hanya jika ada).
+      H+2 -> ringkasan final dikirim apa pun kondisinya, lalu run ditutup.
+
+    Jika semua peserta sudah update lebih awal, run sudah ditutup oleh handler
+    reply (replies.py) sehingga tidak ikut diproses di sini lagi.
+    """
     for run in db.get_open_runs():
         reminder = db.get_reminder(run["reminder_id"])
         if not reminder:
             continue
+
+        age = _run_age_days(run["run_at"], reminder["tz"])
         assignees = db.get_assignees(run["reminder_id"])
-        pending = [a for a in assignees if not db.has_replied(run["id"], a)]
-        if not pending:
+
+        # H+2 atau lebih (mis. bot sempat mati saat H+2) -> tutup dengan ringkasan.
+        if age >= 2:
+            await _send_final_summary(application, run, reminder, assignees)
             continue
 
-        text = texts.build_nag_text(reminder, pending)
-        reply_to = db.get_run_reminder_message(run["id"])
-        try:
-            msg = await application.bot.send_message(
-                chat_id=reminder["chat_id"],
-                message_thread_id=reminder["thread_id"] or None,
-                text=text,
-                parse_mode="HTML",
-                reply_to_message_id=reply_to,
-                allow_sending_without_reply=True,
-            )
-            db.add_run_message(run["id"], msg.message_id, "nag")
-        except Exception:
-            log.exception("Gagal mengirim nag untuk run %s", run["id"])
+        # H+1 -> pengingat harian hanya untuk yang belum update.
+        if age == 1:
+            pending = [a for a in assignees if not db.has_replied(run["id"], a)]
+            if pending:
+                await _send_nag(application, run, reminder, pending)

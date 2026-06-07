@@ -31,13 +31,13 @@ async def _post_init(application) -> None:
     sched.start()
     scheduler.rebuild_jobs(sched, application)
 
-    # Job nag harian.
+    # Job tindak lanjut harian: nag (H+1) & ringkasan final (H+2).
     from apscheduler.triggers.cron import CronTrigger
     sched.add_job(
-        scheduler.run_nags,
+        scheduler.run_daily_followups,
         trigger=CronTrigger(hour=cfg.nag_hour, minute=0),
         args=[application],
-        id="daily-nag",
+        id="daily-followups",
         replace_existing=True,
     )
 

@@ -11,8 +11,11 @@ Dibangun dengan `python-telegram-bot` (v21), `APScheduler`, dan `SQLite`.
 - ✅ Di grup, **mention (@)** pengguna untuk menugaskan task.
 - ✅ Atur **tanggal & jam** mulai serta **frekuensi**: sekali / tiap jam / harian / mingguan / bulanan / tahunan, dengan **interval** (mis. tiap 2 hari).
 - ✅ Pengguna (atau yang ditugaskan) **update progress** dengan **reply/quote** pesan bot.
-- ✅ Jika **semua** yang di-mention sudah update → bot kirim **ringkasan progress**.
-- ✅ Yang **belum** update akan **diingatkan tiap hari** (di-mention ulang).
+- ✅ Jika **semua** yang di-mention sudah update → bot langsung kirim **ringkasan progress** & tutup siklus.
+- ✅ **Strategi pengingat per siklus reminder:**
+  - **Hari H** — bot kirim **pesan reminder**.
+  - **H+1** — **hanya jika** masih ada yang belum update, bot kirim **pengingat harian** (di-mention ulang). Jika semua sudah update, tidak ada pengingat.
+  - **H+2** — bot kirim **ringkasan final** apa pun kondisinya (meski sebagian / belum ada yang update) lalu **menutup** siklus tersebut.
 - ✅ Setelah ringkasan terkirim, reply ke pesan reminder/summary **diabaikan**.
 
 ## Persyaratan
@@ -142,8 +145,9 @@ disisakan. Di chat pribadi, pesan tidak dihapus.
    ```
 3. Kirim **tanggal & jam** mulai: `YYYY-MM-DD HH:MM` (zona waktu dari `DEFAULT_TZ`).
 4. Pilih **frekuensi** lewat tombol, lalu **interval** (atau `/skip` untuk 1).
-5. Saat reminder datang, **reply/quote** pesan bot untuk update progress.
-6. Setelah semua yang ditugaskan update → bot kirim **ringkasan** otomatis.
+5. Saat reminder datang (**hari H**), **reply/quote** pesan bot untuk update progress.
+6. **H+1**: yang belum update akan diingatkan ulang (kalau semua sudah update, dilewati).
+7. Setelah semua yang ditugaskan update → bot kirim **ringkasan** otomatis. Jika sampai **H+2** masih ada yang belum, bot tetap kirim **ringkasan final** dan menutup siklus.
 
 ### Contoh tampilan pesan
 
@@ -203,6 +207,20 @@ Belum update progress untuk: Daftar Task (3 item) — 2026-06-10
   3. selesai, sudah deploy
 ```
 
+**Ringkasan final** (dikirim otomatis di **H+2** meski sebagian belum update):
+
+```
+⏳ Batas waktu update tercapai — ringkasan progress
+📋 Ringkasan: Daftar Task (3 item) — 2026-06-10
+
+• @aziz_alqudsy:
+  1. selesai
+  2. masih proses
+• @FiqihNR: belum update
+• @riskinvnda:
+  3. selesai, sudah deploy
+```
+
 > Catatan: teks tebal/miring di atas disederhanakan menjadi teks biasa. Di Telegram,
 > judul & label tampil **tebal**, dan contoh format ditampilkan dalam blok `monospace`.
 
@@ -224,7 +242,7 @@ bot/
   config.py         # konfigurasi dari .env
   db.py             # penyimpanan SQLite
   parser.py         # validasi numbering + ekstraksi mention
-  scheduler.py      # APScheduler: penjadwalan reminder + nag harian
+  scheduler.py      # APScheduler: penjadwalan reminder + tindak lanjut harian (nag H+1, ringkasan H+2)
   texts.py          # penyusunan teks pesan (HTML)
   handlers/
     conversation.py # alur /new (tasks -> jadwal -> frekuensi)
@@ -237,7 +255,11 @@ tests_smoke.py      # smoke test parser & alur DB
 ## Catatan teknis
 
 - Jadwal job dibangun ulang dari DB saat startup (job tidak dipersist, datanya yang dipersist).
-- Reminder harian (nag) berjalan pada jam `NAG_HOUR` (default 09:00 zona `DEFAULT_TZ`).
+- Job tindak lanjut harian berjalan pada jam `NAG_HOUR` (default 09:00 zona `DEFAULT_TZ`).
+  Untuk tiap siklus reminder yang masih terbuka, umur run dihitung dalam **hari kalender**
+  (zona `DEFAULT_TZ`): umur **1 hari** → pengingat (jika masih ada yang belum update),
+  umur **≥2 hari** → ringkasan final + tutup siklus. Pemakaian `≥2` membuat ringkasan tetap
+  terkirim walau bot sempat mati saat H+2.
 - Pencocokan "siapa sudah update": berdasarkan `user_id` (mention via text_mention)
   atau `username` (mention `@`).
 - Jalankan test: `python tests_smoke.py`.

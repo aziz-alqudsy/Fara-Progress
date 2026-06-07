@@ -63,16 +63,24 @@ def build_nag_text(reminder, pending_assignees) -> str:
     )
 
 
-def build_summary_text(reminder, rows) -> str:
-    """rows = list of (mention_html, progress_text)."""
+def build_summary_text(reminder, rows, *, all_done: bool = True) -> str:
+    """rows = list of (mention_html, progress_text).
+
+    all_done=True  -> ringkasan saat semua peserta sudah update.
+    all_done=False -> ringkasan final (batas waktu H+2) meski ada yang belum;
+                      progress_text None/kosong ditandai "belum update".
+    """
     title = escape(reminder["title"] or "Reminder")
-    out = [
-        "✅ <b>Semua peserta sudah update progress!</b>",
-        f"📋 Ringkasan: <b>{title}</b>",
-        "",
-    ]
+    if all_done:
+        header = "✅ <b>Semua peserta sudah update progress!</b>"
+    else:
+        header = "⏳ <b>Batas waktu update tercapai — ringkasan progress</b>"
+    out = [header, f"📋 Ringkasan: <b>{title}</b>", ""]
     for mention_html, text in rows:
-        text = (text or "-").strip() or "-"
-        indented = "\n".join("  " + line for line in escape(text).split("\n"))
+        clean = (text or "").strip()
+        if not clean:
+            out.append(f"• {mention_html}: <i>belum update</i>")
+            continue
+        indented = "\n".join("  " + line for line in escape(clean).split("\n"))
         out.append(f"• {mention_html}:\n{indented}")
     return "\n".join(out)
