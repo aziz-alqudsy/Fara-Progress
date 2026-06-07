@@ -38,8 +38,10 @@ def load_config() -> Config:
         nag_hour = 9
     nag_hour = max(0, min(23, nag_hour))
 
+    # Render (dan PaaS lain) menyuntik env var PORT yang WAJIB dipakai.
+    # Prioritaskan PORT bila ada, jatuh ke WEBHOOK_PORT, lalu default 8443.
     try:
-        webhook_port = int(os.getenv("WEBHOOK_PORT", "8443"))
+        webhook_port = int(os.getenv("PORT") or os.getenv("WEBHOOK_PORT", "8443"))
     except ValueError:
         webhook_port = 8443
 
