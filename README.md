@@ -59,6 +59,42 @@ cloudflared tunnel --url http://localhost:8443
 # pakai URL https hasilnya sebagai WEBHOOK_URL
 ```
 
+## Deploy ke Render.com
+
+Render memberi URL HTTPS publik (mis. `https://nama-service-kamu.onrender.com`)
+yang langsung dipakai sebagai `WEBHOOK_URL`.
+
+### Langkah
+
+1. Push repo ini ke GitHub.
+2. Render → **New → Web Service** → connect repo.
+3. **Build command:** `pip install -r requirements.txt`
+4. **Start command:** `python run.py`
+5. **Environment variables:**
+
+   | Key | Value |
+   |---|---|
+   | `BOT_TOKEN` | token dari @BotFather |
+   | `RUN_MODE` | `webhook` |
+   | `WEBHOOK_URL` | `https://nama-service-kamu.onrender.com` |
+   | `WEBHOOK_PATH` | `telegram` |
+   | `DEFAULT_TZ` | `Asia/Jakarta` |
+
+   > **Jangan** set `WEBHOOK_PORT`. Render menyuntik env var `PORT` sendiri dan
+   > bot otomatis bind ke port tersebut.
+
+6. Deploy. Bot otomatis mendaftarkan webhook ke Telegram saat start.
+
+### ⚠️ Catatan penting Render
+
+- **Free tier tidur saat idle (~15 menit).** Webhook tetap bangun saat ada chat
+  masuk, tetapi **reminder terjadwal & nag harian tidak akan fire** selama service
+  tidur. Untuk reminder yang andal, pakai paket **Starter** (selalu hidup).
+- **Filesystem ephemeral.** File `reminder.db` (SQLite) akan **ter-reset setiap
+  redeploy/restart**, sehingga semua reminder hilang. Untuk produksi, gunakan
+  **Persistent Disk** Render (set `DB_PATH` ke path yang di-mount, mis.
+  `/data/reminder.db`) atau pindah ke **PostgreSQL**.
+
 ## ⚠️ Penting untuk pemakaian di GRUP
 
 Secara default Telegram mengaktifkan **privacy mode** sehingga bot tidak menerima
