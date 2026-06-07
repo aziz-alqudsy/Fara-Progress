@@ -116,6 +116,20 @@ tetapi agar paling andal sebaiknya **matikan privacy mode**:
 Lalu tambahkan bot ke grup. Untuk topic grup, jalankan perintah di dalam topic
 yang diinginkan — reminder akan dikirim ke topic tersebut.
 
+### Auto-hapus pesan setup di grup
+
+Agar tanya-jawab saat `/new` tidak memenuhi chat anggota lain, di grup bot
+**menghapus otomatis** semua pesan setup (perintah `/new`, prompt bot, dan jawaban
+pengguna) setelah reminder selesai dibuat — hanya satu pesan konfirmasi yang
+disisakan. Di chat pribadi, pesan tidak dihapus.
+
+> **Syarat:** agar bisa menghapus *pesan pengguna*, **bot harus jadi admin grup
+> dengan izin "Delete messages"**. Tanpa izin itu, bot tetap menghapus pesan
+> miliknya sendiri, tetapi jawaban pengguna akan tertinggal.
+>
+> Catatan: notifikasi tetap muncul sesaat selama proses setup berlangsung;
+> pesannya baru dihapus setelah setup selesai.
+
 ## Cara pakai
 
 1. `/new` — mulai membuat reminder.

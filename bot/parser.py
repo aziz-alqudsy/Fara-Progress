@@ -59,6 +59,11 @@ def validate_task_text(text: str) -> None:
         raise TaskFormatError("Belum ada item task yang valid.")
 
 
+def count_main_items(text: str) -> int:
+    """Hitung jumlah item bernomor utama (1. 2. 3. ...), abaikan sub-abjad."""
+    return sum(1 for raw in text.split("\n") if _MAIN.match(raw.strip()))
+
+
 def extract_assignees(message: Message):
     """Ambil daftar pengguna yang di-mention pada pesan task.
 
