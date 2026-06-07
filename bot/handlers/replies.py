@@ -4,7 +4,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from .. import db, texts
+from .. import db, parser, texts
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,22 @@ async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
     progress_text = msg.text or msg.caption or ""
+
+    # Update progress wajib memakai numbering (mengacu nomor task). Reply tanpa
+    # angka ditolak dan diminta diulang.
+    try:
+        parser.validate_task_text(progress_text)
+    except parser.TaskFormatError:
+        await msg.reply_text(
+            "⚠️ Update progress harus memakai <b>nomor task</b>.\n"
+            "Reply/quote lagi pesan reminder dengan format bernomor, contoh:\n"
+            "<code>1. selesai\n"
+            "2. masih proses\n"
+            "3. belum mulai</code>",
+            parse_mode="HTML",
+        )
+        return
+
     db.add_progress(run["id"], user.id, user.username, user.full_name, progress_text)
 
     assignees = db.get_assignees(run["reminder_id"])

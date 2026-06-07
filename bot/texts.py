@@ -44,7 +44,10 @@ def build_reminder_text(reminder, assignees) -> str:
         lines.append(f"👥 <b>Ditugaskan ke:</b> {mentions}")
     lines.append(f"🔁 <i>Jadwal: {_freq_text(reminder['freq'], reminder['interval'])}</i>")
     lines.append("")
-    lines.append("💬 <b>Balas (reply/quote) pesan ini</b> untuk meng-update progress kamu.")
+    lines.append(
+        "💬 <b>Cara update:</b> balas (reply/quote) pesan ini dengan <b>nomor task</b>, contoh:"
+    )
+    lines.append("<code>1. selesai\n2. masih proses\n3. belum mulai</code>")
     return "\n".join(lines)
 
 
@@ -55,7 +58,8 @@ def build_nag_text(reminder, pending_assignees) -> str:
         "⏰ <b>Pengingat harian</b>\n"
         f"Belum update progress untuk: <b>{title}</b>\n\n"
         f"{mentions}\n\n"
-        "💬 Mohon balas (reply/quote) pesan reminder di atas untuk update progress kamu."
+        "💬 Mohon balas (reply/quote) pesan reminder dengan <b>nomor task</b>, contoh:\n"
+        "<code>1. selesai\n2. masih proses</code>"
     )
 
 
@@ -69,5 +73,6 @@ def build_summary_text(reminder, rows) -> str:
     ]
     for mention_html, text in rows:
         text = (text or "-").strip() or "-"
-        out.append(f"• {mention_html}:\n  {escape(text)}")
+        indented = "\n".join("  " + line for line in escape(text).split("\n"))
+        out.append(f"• {mention_html}:\n{indented}")
     return "\n".join(out)

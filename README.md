@@ -145,6 +145,67 @@ disisakan. Di chat pribadi, pesan tidak dihapus.
 5. Saat reminder datang, **reply/quote** pesan bot untuk update progress.
 6. Setelah semua yang ditugaskan update → bot kirim **ringkasan** otomatis.
 
+### Contoh tampilan pesan
+
+**Pesan reminder** (dikirim saat jadwal tiba):
+
+```
+🔔 Daftar Task (3 item) — 2026-06-10
+
+1. [App] Implement feedback page @aziz_alqudsy
+2. [App] Create itinerary @FiqihNR
+3. [BE] Create API feedback @riskinvnda
+
+👥 Ditugaskan ke: @aziz_alqudsy, @FiqihNR, @riskinvnda
+🔁 Jadwal: harian
+
+💬 Cara update: balas (reply/quote) pesan ini dengan nomor task, contoh:
+1. selesai
+2. masih proses
+3. belum mulai
+```
+
+**Jika reply tanpa nomor → ditolak:**
+
+```
+⚠️ Update progress harus memakai nomor task.
+Reply/quote lagi pesan reminder dengan format bernomor, contoh:
+1. selesai
+2. masih proses
+3. belum mulai
+```
+
+**Pengingat harian** (untuk yang belum update):
+
+```
+⏰ Pengingat harian
+Belum update progress untuk: Daftar Task (3 item) — 2026-06-10
+
+@FiqihNR
+
+💬 Mohon balas (reply/quote) pesan reminder dengan nomor task, contoh:
+1. selesai
+2. masih proses
+```
+
+**Ringkasan** (dikirim otomatis setelah semua peserta update):
+
+```
+✅ Semua peserta sudah update progress!
+📋 Ringkasan: Daftar Task (3 item) — 2026-06-10
+
+• @aziz_alqudsy:
+  1. selesai
+  2. masih proses
+• @FiqihNR:
+  2. selesai
+• @riskinvnda:
+  3. selesai, sudah deploy
+```
+
+> Catatan: teks tebal/miring di atas disederhanakan menjadi teks biasa. Di Telegram,
+> judul & label tampil **tebal**, dan contoh format ditampilkan dalam blok `monospace`.
+
 ### Perintah
 
 | Perintah | Fungsi |
