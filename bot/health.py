@@ -14,11 +14,20 @@ log = logging.getLogger(__name__)
 
 
 class _HealthHandler(tornado.web.RequestHandler):
-    """Balas 200 untuk GET/HEAD. Dipakai sebagai target keep-alive/monitoring."""
+    """Balas 200 untuk GET/HEAD. Dipakai sebagai target keep-alive/monitoring.
+
+    Tornado tidak otomatis memetakan HEAD ke GET (beda dari Flask) — tanpa
+    ``head()`` eksplisit, monitor yang memakai HEAD (mis. UptimeRobot default)
+    akan mendapat 405. Karena itu kedua metode didukung.
+    """
 
     def get(self) -> None:
         self.set_header("Content-Type", "text/plain; charset=utf-8")
         self.write("ok")
+
+    def head(self) -> None:
+        # HEAD: cukup status 200 tanpa body.
+        self.set_status(200)
 
 
 _installed = False
