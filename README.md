@@ -82,6 +82,7 @@ yang langsung dipakai sebagai `WEBHOOK_URL`.
    | `WEBHOOK_URL` | `https://nama-service-kamu.onrender.com` |
    | `WEBHOOK_PATH` | `telegram` |
    | `DEFAULT_TZ` | `Asia/Jakarta` |
+   | `DATABASE_URL` | connection string PostgreSQL (Neon/Supabase) — **wajib agar data tidak hilang saat redeploy**, lihat bagian *PostgreSQL persisten* |
 
    > **Jangan** set `WEBHOOK_PORT`. Render menyuntik env var `PORT` sendiri dan
    > bot otomatis bind ke port tersebut.
@@ -126,9 +127,31 @@ mem-pin versi Python. Alternatif: set env var `PYTHON_VERSION=3.12.7` di dashboa
 > Kombinasi keduanya membuat reminder cukup andal di free tier, tapi untuk
 > ketepatan waktu penuh paket **Starter** tetap paling baik.
 - **Filesystem ephemeral.** File `reminder.db` (SQLite) akan **ter-reset setiap
-  redeploy/restart**, sehingga semua reminder hilang. Untuk produksi, gunakan
-  **Persistent Disk** Render (set `DB_PATH` ke path yang di-mount, mis.
-  `/data/reminder.db`) atau pindah ke **PostgreSQL**.
+  redeploy/restart**, sehingga semua reminder hilang. **Untuk produksi WAJIB pakai
+  PostgreSQL** (lihat di bawah) — atau **Persistent Disk** Render bila pakai paket
+  berbayar (set `DB_PATH` ke path yang di-mount, mis. `/data/reminder.db`).
+
+#### PostgreSQL persisten (gratis via Neon) — disarankan untuk produksi
+
+Tanpa ini, semua reminder hilang tiap redeploy. Bot memilih backend otomatis:
+**bila `DATABASE_URL` diisi → PostgreSQL**, selain itu → SQLite (`DB_PATH`).
+
+1. Buat database Postgres gratis & permanen di [Neon](https://neon.tech) (atau
+   [Supabase](https://supabase.com)). Salin **connection string**-nya, contoh:
+   `postgresql://user:password@ep-xxx.neon.tech/dbname?sslmode=require`
+2. Di Render → **Environment** → tambahkan env var:
+
+   | Key | Value |
+   |---|---|
+   | `DATABASE_URL` | connection string dari Neon (sertakan `?sslmode=require`) |
+
+3. Deploy. Saat start, log menampilkan `Backend DB: PostgreSQL` dan tabel dibuat
+   otomatis. Reminder kini **aman walau redeploy**.
+
+> - Skema `postgres://` otomatis dinormalkan ke `postgresql://`.
+> - Bot **reconnect otomatis** bila koneksi sempat putus (Neon free tier
+>   meng-suspend compute saat idle) — kombinasikan dengan keep-alive `/health`.
+> - Tanpa `DATABASE_URL`, bot tetap jalan dengan SQLite (praktis untuk lokal).
 
 ## ⚠️ Penting untuk pemakaian di GRUP
 
@@ -262,7 +285,7 @@ Belum update progress untuk: Daftar Task (3 item) — 2026-06-10
 bot/
   app.py            # bootstrap: handler, scheduler, mode jalan
   config.py         # konfigurasi dari .env
-  db.py             # penyimpanan SQLite
+  db.py             # penyimpanan: PostgreSQL (DATABASE_URL) atau SQLite (lokal)
   parser.py         # validasi numbering + ekstraksi mention
   scheduler.py      # APScheduler: penjadwalan reminder + tindak lanjut harian (nag H+1, ringkasan H+2)
   health.py         # endpoint GET /health (200) untuk keep-alive/monitoring (mode webhook)

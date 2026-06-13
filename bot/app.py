@@ -64,7 +64,8 @@ async def _post_shutdown(application) -> None:
 
 def main() -> None:
     cfg = load_config()
-    db.init_db(cfg.db_path)
+    db.init_db(cfg.db_path, cfg.database_url or None)
+    log.info("Backend DB: %s", "PostgreSQL" if cfg.database_url else f"SQLite ({cfg.db_path})")
 
     application = (
         ApplicationBuilder()

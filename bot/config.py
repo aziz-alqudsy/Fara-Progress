@@ -11,6 +11,7 @@ load_dotenv()
 class Config:
     bot_token: str
     db_path: str
+    database_url: str
     default_tz: str
     nag_hour: int
     run_mode: str  # "webhook" | "polling"
@@ -45,9 +46,17 @@ def load_config() -> Config:
     except ValueError:
         webhook_port = 8443
 
+    # PostgreSQL bila DATABASE_URL diisi (data persisten); selain itu SQLite.
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    # Beberapa penyedia memberi skema "postgres://"; psycopg/libpq menerima
+    # keduanya, tapi normalkan ke "postgresql://" agar konsisten.
+    if database_url.startswith("postgres://"):
+        database_url = "postgresql://" + database_url[len("postgres://"):]
+
     return Config(
         bot_token=token,
         db_path=os.getenv("DB_PATH", "reminder.db").strip(),
+        database_url=database_url,
         default_tz=os.getenv("DEFAULT_TZ", "Asia/Jakarta").strip(),
         nag_hour=nag_hour,
         run_mode=run_mode,
