@@ -1,6 +1,6 @@
 """Penjadwalan reminder dengan APScheduler + job nag harian."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -98,6 +98,76 @@ def rebuild_jobs(scheduler: AsyncIOScheduler, application) -> None:
         except Exception:
             log.exception("Gagal menjadwalkan reminder %s", r["id"])
     log.info("Menjadwalkan ulang %s reminder.", count)
+
+
+def _cron_prev(reminder, start, now):
+    """Occurrence terakhir <= now untuk freq monthly/yearly (pakai CronTrigger)."""
+    trig = _build_trigger(reminder)
+    fire = trig.get_next_fire_time(None, start)
+    prev = None
+    guard = 0
+    while fire is not None and fire <= now and guard < 100_000:
+        prev = fire
+        fire = trig.get_next_fire_time(fire, fire + timedelta(seconds=1))
+        guard += 1
+    return prev
+
+
+def _missed_fire_time(reminder, now, last_run_at):
+    """Occurrence terjadwal terbaru yang <= now dan BELUM pernah dikirim.
+
+    Mengembalikan datetime occurrence terlewat, atau None jika tidak ada yang
+    perlu di-catch-up (jadwal masih di masa depan, atau occurrence terakhir
+    sudah punya run)."""
+    start = datetime.fromtimestamp(reminder["start_utc"], tz=timezone.utc)
+    if start > now:
+        return None
+
+    freq = reminder["freq"]
+    interval = max(1, int(reminder["interval"]))
+
+    if freq == "once":
+        prev = start
+    elif freq in ("hourly", "daily", "weekly"):
+        unit = {"hourly": 3600, "daily": 86400, "weekly": 604800}[freq]
+        step = unit * interval
+        n = int((now - start).total_seconds() // step)
+        prev = start + timedelta(seconds=step * n)
+    else:  # monthly / yearly
+        prev = _cron_prev(reminder, start, now)
+
+    if prev is None or prev > now:
+        return None
+
+    # Sudah ada run pada/ setelah occurrence ini -> tidak terlewat.
+    if last_run_at is not None and last_run_at >= prev.timestamp() - 1:
+        return None
+    return prev
+
+
+async def run_catchup(application) -> None:
+    """Saat startup/wake: fire reminder yang occurrence terjadwalnya terlewat
+    selagi bot mati. Hanya occurrence TERAKHIR yang dikirim (tidak menumpuk),
+    sehingga reminder tetap masuk walau telat alih-alih hilang sampai siklus
+    berikutnya."""
+    now = datetime.now(timezone.utc)
+    fired = 0
+    for reminder in db.list_active_reminders():
+        try:
+            last_run_at = db.get_last_run_at(reminder["id"])
+            missed = _missed_fire_time(reminder, now, last_run_at)
+            if missed is None:
+                continue
+            log.info(
+                "Catch-up reminder %s: occurrence %s terlewat, fire sekarang.",
+                reminder["id"], missed.isoformat(),
+            )
+            await fire_reminder(application, reminder["id"])
+            fired += 1
+        except Exception:
+            log.exception("Gagal catch-up reminder %s", reminder["id"])
+    if fired:
+        log.info("Catch-up: %s reminder terlewat di-fire.", fired)
 
 
 async def fire_reminder(application, reminder_id) -> None:

@@ -195,6 +195,15 @@ def get_open_runs():
     return cur.fetchall()
 
 
+def get_last_run_at(reminder_id):
+    """Epoch run terakhir untuk reminder, atau None jika belum pernah fire."""
+    cur = _conn.execute(
+        "SELECT MAX(run_at) AS m FROM runs WHERE reminder_id=?", (reminder_id,)
+    )
+    row = cur.fetchone()
+    return row["m"] if row and row["m"] is not None else None
+
+
 def get_run_reminder_message(run_id):
     cur = _conn.execute(
         "SELECT message_id FROM run_messages WHERE run_id=? AND kind='reminder' ORDER BY id LIMIT 1",

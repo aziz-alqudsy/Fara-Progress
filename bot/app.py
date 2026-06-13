@@ -31,6 +31,11 @@ async def _post_init(application) -> None:
     sched.start()
     scheduler.rebuild_jobs(sched, application)
 
+    # Catch-up: kirim reminder yang occurrence-nya terlewat selagi bot mati
+    # (mis. service tidur saat jam jadwal). Tanpa ini, occurrence yang terlewat
+    # hilang karena trigger melompat ke jadwal berikutnya saat dijadwalkan ulang.
+    await scheduler.run_catchup(application)
+
     # Job tindak lanjut harian: nag (H+1) & ringkasan final (H+2).
     from apscheduler.triggers.cron import CronTrigger
     sched.add_job(
@@ -84,6 +89,9 @@ def main() -> None:
     if cfg.run_mode == "webhook":
         if not cfg.webhook_url:
             raise SystemExit("RUN_MODE=webhook tetapi WEBHOOK_URL kosong. Isi di .env.")
+        # Endpoint /health untuk keep-alive / monitoring (UptimeRobot dsb.).
+        from .health import install_health_endpoint
+        install_health_endpoint("/health")
         log.info("Menjalankan mode webhook di %s/%s", cfg.webhook_url, cfg.webhook_path)
         application.run_webhook(
             listen=cfg.webhook_listen,

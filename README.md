@@ -102,7 +102,29 @@ mem-pin versi Python. Alternatif: set env var `PYTHON_VERSION=3.12.7` di dashboa
 
 - **Free tier tidur saat idle (~15 menit).** Webhook tetap bangun saat ada chat
   masuk, tetapi **reminder terjadwal & nag harian tidak akan fire** selama service
-  tidur. Untuk reminder yang andal, pakai paket **Starter** (selalu hidup).
+  tidur. Untuk reminder yang andal, pakai paket **Starter** (selalu hidup), atau
+  kombinasikan dua mitigasi di bawah.
+
+#### Mengakali tidur di free tier (cron-job.org + catch-up)
+
+1. **Keep-alive ping (cron-job.org / UptimeRobot).** Agar service tidak tidur saat
+   jam jadwal, buat monitor/cronjob gratis yang mem-**ping endpoint `/health` tiap
+   ~10 menit**:
+   - **URL:** `https://nama-service-kamu.onrender.com/health`
+   - **Schedule / interval:** tiap 5–10 menit.
+   - Metode `GET` cukup. Endpoint ini membalas **HTTP 200 `ok`**, jadi monitor akan
+     berstatus **UP** (bukan 404 seperti kalau nge-ping path lain).
+
+   > Bot mendaftarkan `/health` sendiri di server webhook-nya (lihat
+   > `bot/health.py`). Endpoint ini hanya aktif di **mode webhook**.
+2. **Catch-up otomatis saat startup.** Jika sebuah occurrence tetap terlewat
+   (mis. ping sempat gagal / redeploy tepat saat jam jadwal), saat bot start/wake
+   bot otomatis mengirim **occurrence terakhir yang terlewat** (lihat
+   `scheduler.run_catchup`). Jadi reminder masuk **telat** alih-alih hilang sampai
+   siklus berikutnya. Hanya occurrence terbaru yang dikirim — tidak menumpuk.
+
+> Kombinasi keduanya membuat reminder cukup andal di free tier, tapi untuk
+> ketepatan waktu penuh paket **Starter** tetap paling baik.
 - **Filesystem ephemeral.** File `reminder.db` (SQLite) akan **ter-reset setiap
   redeploy/restart**, sehingga semua reminder hilang. Untuk produksi, gunakan
   **Persistent Disk** Render (set `DB_PATH` ke path yang di-mount, mis.
@@ -243,6 +265,7 @@ bot/
   db.py             # penyimpanan SQLite
   parser.py         # validasi numbering + ekstraksi mention
   scheduler.py      # APScheduler: penjadwalan reminder + tindak lanjut harian (nag H+1, ringkasan H+2)
+  health.py         # endpoint GET /health (200) untuk keep-alive/monitoring (mode webhook)
   texts.py          # penyusunan teks pesan (HTML)
   handlers/
     conversation.py # alur /new (tasks -> jadwal -> frekuensi)
@@ -255,6 +278,10 @@ tests_smoke.py      # smoke test parser & alur DB
 ## Catatan teknis
 
 - Jadwal job dibangun ulang dari DB saat startup (job tidak dipersist, datanya yang dipersist).
+- **Catch-up startup:** setelah membangun ulang job, bot mengecek tiap reminder aktif —
+  bila occurrence terjadwal terakhir sudah lewat tapi belum punya `run`, occurrence itu
+  langsung di-fire (telat) alih-alih hilang. Mencegah reminder "loncat" ke siklus
+  berikutnya saat service sempat mati di jam jadwal.
 - Job tindak lanjut harian berjalan pada jam `NAG_HOUR` (default 09:00 zona `DEFAULT_TZ`).
   Untuk tiap siklus reminder yang masih terbuka, umur run dihitung dalam **hari kalender**
   (zona `DEFAULT_TZ`): umur **1 hari** → pengingat (jika masih ada yang belum update),
