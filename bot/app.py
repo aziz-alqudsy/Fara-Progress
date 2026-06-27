@@ -37,10 +37,13 @@ async def _post_init(application) -> None:
     await scheduler.run_catchup(application)
 
     # Job tindak lanjut harian: nag (H+1) & ringkasan final (H+2).
+    # PENTING: beri timezone eksplisit. CronTrigger instance TIDAK mewarisi
+    # timezone scheduler — tanpa ini ia memakai tz lokal server (UTC di Render),
+    # sehingga jam 9 jadi 09:00 UTC (= 16:00 WIB), bukan 09:00 WIB.
     from apscheduler.triggers.cron import CronTrigger
     sched.add_job(
         scheduler.run_daily_followups,
-        trigger=CronTrigger(hour=cfg.nag_hour, minute=0),
+        trigger=CronTrigger(hour=cfg.nag_hour, minute=0, timezone=sched.timezone),
         args=[application],
         id="daily-followups",
         replace_existing=True,
